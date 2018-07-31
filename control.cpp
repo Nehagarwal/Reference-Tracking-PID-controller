@@ -2,6 +2,7 @@
 #include <bitset>
 #include <climits>
 #include <cmath>
+#include <complex>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -70,41 +71,24 @@ CarPose Step(CarPose& current_pose, double steering_angle,
     return nextstep;
 }
 
-double cte(double& x1, double& y1, double& x2, double& y2, double& pointX, double& pointY)
+double cross(double& x1, double& y1, double& x2, double& y2)
 {
-    double diffX = x2 - x1;
-    float diffY = y2 - y1;
-    if ((diffX == 0) && (diffY == 0))
-    {
-        diffX = pointX - x1;
-        diffY = pointY - y1;
-        return sqrt(diffX * diffX + diffY * diffY);
-    }
-
-    float t = ((pointX - x1) * diffX + (pointY - y1) * diffY) / (diffX * diffX + diffY * diffY);
-
-    if (t < 0)
-    {
-        //point is nearest to the first point i.e x1 and y1
-        diffX = pointX - x1;
-        diffY = pointY - y1;
-    }
-    else if (t > 1)
-    {
-        //point is nearest to the end point i.e x2 and y2
-        diffX = pointX - x2;
-        diffY = pointY - y2;
-    }
-    else
-    {
-        //if perpendicular line intersect the line segment.
-        diffX = pointX - (x1 + t * diffX);
-        diffY = pointY - (y1 + t * diffY);
-    }
-
-    //returning shortest distance
-    return sqrt(diffX * diffX + diffY * diffY);
+   double z;
+   z = x1*y2 - x2*y1;
+   
+   return z;
 }
+
+double point_to_line(double& pointX, double& pointY, double& x1, double& y1, double& x2, double& y2)
+{
+   double ax = x1 - x2;
+   double ay = y1 - y2;
+   double bx = pointX - x2;
+   double by = pointY - y2;
+   double d = std::norm(cross(ax,ay,bx,by)) / sqrt(ax*ax + ay*ay);
+   return d;
+}
+
 /**
  * Simulates the car tracking the reference path by setting the car's
  * steering_angles.
@@ -124,23 +108,31 @@ void Simulate(std::vector<CarPose>& reference,
   // Fill in this function
   // Implement a controller to track the reference trajectory. You
   // can update the car's pose using the previous function.
-  double cte1;
+  double cte1,a1,a2,b1,b2;
+  double perp_dist;
+  double steer;
   double kp=0.5;
   double kd = 3;
   double ki = 0.004;
   double cte_prev=0;
-  double diff_cte;
+  doulble diff_cte;
   double int_diff = 0;
   //int_diff = int_diff + cte1;
   int i;
   for(i=0;i<200;i++)
   {
-      cte1 = cte(reference[i].x,reference[i].y,reference[i+1].x,reference[i+1].y,initial_pose.x,initial_pose.y)l;
+      perp_dist = point_to_line(initial_pose.x,initial_pose.y,reference[i].x,reference[i].y,reference[i+1].x,reference[i+1].y);
+      a1 = reference[i+1].x-reference[i].x;
+      a2 = reference[i+1].y-reference[i].y;
+      b1 = initial_pose.x - reference[i].x;
+      b2 = initial_pose.y - reference[i].y;
+      steer = cross(a1,a2,b1,b2)/std::norm(cross(a1,a2,b1,b2));
+      cte1 = (initial_pose.theta - reference[i+1].theta) + perp_dist*steer;
       diff_cte = cte1 - cte_prev;
       int_diff = int_diff + cte1;
       steering_angles->push_back(-kp*cte1 -kd*diff_cte -ki*int_diff);
       path->push_back(Step(initial_pose,steering_angles->back(),1,0.02));
-      
+      cte_prev = cte1;
       initial_pose = path->back();
       }
       
@@ -164,5 +156,4 @@ int main() {
 //            << std::endl;
   return 0;
 }
-
 
